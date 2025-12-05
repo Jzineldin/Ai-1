@@ -39,7 +39,7 @@ export function autoCorrelate(buffer, sampleRate) {
     }
     rms = Math.sqrt(rms / SIZE);
 
-    if (rms < 0.01) return -1; // Too quiet
+    if (rms < 0.001) return -1; // Too quiet (allow very low signals, gate them later)
 
     let r1 = 0, r2 = SIZE - 1, thres = 0.2;
     for (let i = 0; i < SIZE / 2; i++) {
@@ -76,4 +76,25 @@ export function autoCorrelate(buffer, sampleRate) {
     if (a) T0 = T0 - b / (2 * a);
 
     return sampleRate / T0;
+}
+
+/**
+ * Calculates Spectral Centroid (Center of Mass of the spectrum).
+ * Indicates "Brightness" or "Timbre". 
+ * Higher centroid = Brighter sound (often associated with Belting, Straining, or Head voice depending on context).
+ */
+export function getSpectralCentroid(frequencyData, sampleRate) {
+    let numerator = 0;
+    let denominator = 0;
+    const binSize = sampleRate / (frequencyData.length * 2);
+
+    for (let i = 0; i < frequencyData.length; i++) {
+        const magnitude = frequencyData[i];
+        const frequency = i * binSize;
+        numerator += frequency * magnitude;
+        denominator += magnitude;
+    }
+
+    if (denominator === 0) return 0;
+    return numerator / denominator;
 }
