@@ -1,16 +1,22 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-@layer base {
-  body {
-    @apply bg-black text-white overflow-hidden;
-    font-family: 'Inter', sans-serif;
-  }
+@theme {
+  --color-neon-blue: #00c6ff;
+  --color-neon-cyan: #00f3ff;
+  --color-neon-pink: #ff00ff;
+  --color-neon-purple: #bc13fe;
+
+  --color-glass-10: rgba(255, 255, 255, 0.1);
+  --color-glass-20: rgba(255, 255, 255, 0.2);
+
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Custom Utilities */
 .glass-panel {
-  @apply backdrop-blur-lg bg-glass-10 border border-glass-20 rounded-2xl;
+  @apply backdrop-blur-lg border rounded-2xl;
+  background-color: var(--color-glass-10);
+  border-color: var(--color-glass-20);
 }
 
 .neon-text {
@@ -21,6 +27,11 @@
   box-shadow: 0 0 10px rgba(188, 19, 254, 0.3);
 }
 
+body {
+  @apply bg-black text-white overflow-hidden;
+  font-family: 'Inter', sans-serif;
+}
+
 canvas {
-    display: block;
+  display: block;
 }
