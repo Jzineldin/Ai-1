@@ -40,6 +40,12 @@ body::before {
   z-index: 0;
 }
 
+/* Ensure root content is above background */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
 @keyframes gradientShift {
   0% {
     background-position: 0% 50%;
@@ -126,23 +132,36 @@ canvas {
   display: block;
 }
 
-/* Premium scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
+/* Premium scrollbar (Global) */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
   border-radius: 10px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, #764ba2 0%, #f093fb 50%, #4facfe 100%);
+}
+
+/* Hide scrollbar utilities */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 /* Smooth fade in animation */

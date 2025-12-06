@@ -1,32 +1,11 @@
 # 🔑 Singers Dreams - API Setup Guide
 
-Unlock the full **Key Finder** experience by connecting Spotify and YouTube. These keys are free and easy to get.
+Unlock the full **Key Finder** experience by connecting YouTube. This key is free and easy to get.
 
 ---
 
-## 🎵 1. Spotify Integration
-**Access the Global Top 50, Search Tracks, and get Official Key/BPM data.**
 
-### Step 1: Create a Spotify App
-1.  Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and log in.
-2.  Click **"Create App"**.
-3.  Fill in the details:
-    *   **App Name**: `Key Finder` (or anything you like)
-    *   **App Description**: `My vocal analysis app`
-    *   **Redirect URI**: `http://localhost:5173/` 
-        *   ⚠️ **IMPORTANT**: Copy this exactly! The trailing slash `/` matters.
-4.  Check "I understand" and click **Save**.
-
-### Step 2: Connect to the App
-1.  In your new Spotify App dashboard, click **Settings** (top right).
-2.  Copy the **Client ID** (it's a long string of random characters).
-3.  Open **Singers Dreams** (`npm run dev`).
-4.  In the **Key Finder** tab, click **"Configure APIs"** (⚙️ icon).
-5.  Paste your ID into **Spotify Client ID** and click **Connect**.
-
----
-
-## 📺 2. YouTube Integration
+## 📺 1. YouTube Integration
 **Search and Play Trending Music videos directly in the app.**
 
 ### Step 1: Get a Google Cloud Key
@@ -49,7 +28,7 @@ Unlock the full **Key Finder** experience by connecting Spotify and YouTube. The
 
 ---
 
-## 🎧 3. Audio Loopback (For YouTube Analysis)
+## 🎧 2. Audio Loopback (For YouTube Analysis)
 Since YouTube does not provide the musical Key of videos, the app analyzes the audio *while it plays*.
 
 1.  **Windows**:

@@ -661,6 +661,30 @@ export const searchSongs = async (query) => {
                 song.title.toLowerCase().includes(lowerQuery) ||
                 song.artist.toLowerCase().includes(lowerQuery)
             );
+
+            // Sort with priority:
+            // 1. Exact title matches first
+            // 2. Songs with cover art
+            // 3. Then by popularity (ID)
+            results.sort((a, b) => {
+                const aExactMatch = a.title.toLowerCase() === lowerQuery;
+                const bExactMatch = b.title.toLowerCase() === lowerQuery;
+
+                // If one is exact match and other isn't, exact match comes first
+                if (aExactMatch && !bExactMatch) return -1;
+                if (!aExactMatch && bExactMatch) return 1;
+
+                // Prioritize songs with cover art
+                const aHasCover = !!a.cover;
+                const bHasCover = !!b.cover;
+
+                if (aHasCover && !bHasCover) return -1;
+                if (!aHasCover && bHasCover) return 1;
+
+                // Otherwise sort by ID (popularity)
+                return a.id - b.id;
+            });
+
             resolve(results);
         }, 300); // Faster simulation
     });

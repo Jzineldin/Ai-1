@@ -1,14 +1,14 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { autoCorrelate, getNoteFromFrequency, getSpectralCentroid } from './utils';
+import { autoCorrelate, getNoteFromFrequency, getSpectralCentroid, detectBPM, detectPitchRange, getVoiceTypesFromRange } from './utils';
 import { analyzeVoiceType } from './VoiceTypeAnalyzer';
-import { KeyFinder } from './KeyFinder';
+import { KeyFinder, detectKeyFromBuffer } from './KeyFinder';
 import { VibratoDetector } from './VibratoDetector';
 
 const AudioContextState = createContext(null);
 
 export function AudioProvider({ children }) {
     const [isListening, setIsListening] = useState(false);
-    const [sourceType, setSourceType] = useState('mic'); // 'mic' or 'file'
+    const [sourceType, setSourceType] = useState('idle'); // 'mic', 'file', or 'idle'
     const [availableDevices, setAvailableDevices] = useState([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState('default');
 
@@ -24,7 +24,11 @@ export function AudioProvider({ children }) {
         voiceTypeColor: 'text-gray-500',
         volume: 0,
         targetFrequency: 0,
-        estimatedKey: '-'
+        targetFrequency: 0,
+        estimatedKey: '-',
+        bpm: 0,
+        pitchRange: null,
+        detectedVoiceTypes: []
     });
 
     const audioCtxRef = useRef(null);
@@ -34,6 +38,10 @@ export function AudioProvider({ children }) {
     const rafIdRef = useRef(null);
     const keyFinderRef = useRef(new KeyFinder());
     const vibratoRef = useRef(new VibratoDetector());
+    const bpmRef = useRef(0);
+    const rangeRef = useRef(null);
+    const voiceTypesRef = useRef([]);
+    const keyRef = useRef(null); // Static key for files
 
     // For visualizer
     const [freqData, setFreqData] = useState(new Uint8Array(0));
@@ -131,14 +139,40 @@ export function AudioProvider({ children }) {
 
         sourceRef.current = audioCtxRef.current.createBufferSource();
         sourceRef.current.buffer = audioBuffer;
+
+        // Create a silent gain node (volume = 0) to allow processing without audio output
+        const silentGain = audioCtxRef.current.createGain();
+        silentGain.gain.value = 0; // Mute the audio
+
         sourceRef.current.connect(analyzerRef.current);
-        analyzerRef.current.connect(audioCtxRef.current.destination); // Connect to speakers
+        analyzerRef.current.connect(silentGain);
+        silentGain.connect(audioCtxRef.current.destination); // Connect to speakers but muted
 
         sourceRef.current.start(0);
         setSourceType('file');
         setIsListening(true);
         keyFinderRef.current.reset();
         vibratoRef.current.reset();
+        bpmRef.current = 0;
+        rangeRef.current = null;
+        voiceTypesRef.current = [];
+        keyRef.current = null;
+
+        // Calculate Static Key
+        keyRef.current = detectKeyFromBuffer(audioBuffer);
+
+        // Calculate BPM async
+        detectBPM(audioBuffer).then(bpm => {
+            bpmRef.current = bpm;
+        });
+
+        // Calculate Pitch Range Sync (it's fast enough or allows async? It's synchronous loop)
+        // We can run it here
+        const range = detectPitchRange(audioBuffer);
+        if (range) {
+            rangeRef.current = range;
+            voiceTypesRef.current = getVoiceTypesFromRange(range.minFreq, range.maxFreq);
+        }
 
         sourceRef.current.onended = () => setIsListening(false);
         updateLoop();
@@ -236,7 +270,9 @@ export function AudioProvider({ children }) {
                     voiceTypeData.type = voiceTypeBufferRef.current.currentType;
                 }
 
-                keyFinderRef.current.processNote(noteInfo.midi % 12);
+                if (sourceType !== 'file') {
+                    keyFinderRef.current.processNote(noteInfo.midi % 12);
+                }
                 vibratoRef.current.update(pitchBufferRef.current.stableFreq, performance.now());
             }
         } else {
@@ -247,7 +283,9 @@ export function AudioProvider({ children }) {
         }
 
         const vibratoStats = vibratoRef.current.analyze();
-        const estimatedKey = keyFinderRef.current.estimateKey();
+        const estimatedKey = (sourceType === 'file' && keyRef.current)
+            ? keyRef.current
+            : keyFinderRef.current.estimateKey();
 
         setAudioData({
             frequency: frequency !== -1 ? Math.round(frequency) : 0,
@@ -259,7 +297,11 @@ export function AudioProvider({ children }) {
             voiceTypeColor: voiceTypeData.color,
             volume: rms,
             estimatedKey: estimatedKey,
-            vibrato: vibratoStats
+
+            vibrato: vibratoStats,
+            bpm: bpmRef.current,
+            pitchRange: rangeRef.current,
+            detectedVoiceTypes: voiceTypesRef.current
         });
 
         rafIdRef.current = requestAnimationFrame(updateLoop);

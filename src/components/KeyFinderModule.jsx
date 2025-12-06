@@ -78,18 +78,22 @@ const SmartCover = ({ song }) => {
     const [hasError, setHasError] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
     const [isQueued, setIsQueued] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
     const containerRef = useRef(null);
+    const retryTimeoutRef = useRef(null);
 
     // 2. Intersection Observer (Lazy Load)
     useEffect(() => {
+        if (!containerRef.current) return;
+
         const observer = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting) {
                 setIsVisible(true);
-                isVisibleRef.current = true;
                 observer.disconnect();
             }
         });
-        if (imgRef.current) observer.observe(imgRef.current);
+
+        observer.observe(containerRef.current);
         return () => observer.disconnect();
     }, []);
 
@@ -107,7 +111,12 @@ const SmartCover = ({ song }) => {
 
                     try {
                         // Try YouTube first (higher quality, better matching)
-                        let artwork = await YouTubeService.getCoverArt(song.title, song.artist);
+                        let artwork = null;
+                        try {
+                            artwork = await YouTubeService.getCoverArt(song.title, song.artist);
+                        } catch (ytErr) {
+                            console.warn('YouTube cover fetch failed, using iTunes fallback');
+                        }
 
                         // Fallback to iTunes if YouTube fails
                         if (!artwork) {
@@ -132,6 +141,7 @@ const SmartCover = ({ song }) => {
                         if (artwork) {
                             setSrc(artwork);
                             localStorage.setItem(cacheKey, artwork);
+                            setRetryCount(0); // Reset retry count on success
                         } else {
                             setHasError(true);
                         }
@@ -142,6 +152,26 @@ const SmartCover = ({ song }) => {
             });
         }
     }, [isVisible, song, src, hasError, isQueued, cacheKey]);
+
+    // 4. Auto-retry failed cover art loads
+    useEffect(() => {
+        if (hasError && retryCount < 3) {
+            // Exponential backoff: 2s, 4s, 8s
+            const delay = Math.pow(2, retryCount + 1) * 1000;
+
+            retryTimeoutRef.current = setTimeout(() => {
+                setRetryCount(prev => prev + 1);
+                setHasError(false);
+                setIsQueued(false); // Trigger re-fetch
+            }, delay);
+        }
+
+        return () => {
+            if (retryTimeoutRef.current) {
+                clearTimeout(retryTimeoutRef.current);
+            }
+        };
+    }, [hasError, retryCount]);
 
     const handleRetry = (e) => {
         e.stopPropagation();
@@ -177,6 +207,7 @@ const SmartCover = ({ song }) => {
                     src={src}
                     alt={song.title}
                     className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     onLoad={() => setIsLoaded(true)}
                     onError={() => {
                         setSrc(null);
@@ -200,12 +231,25 @@ const SmartCover = ({ song }) => {
 // -----------------------------
 
 export default function KeyFinderModule() {
-    const { handleFileUpload, audioData, setAudioData, isListening, startMic } = useAudio();
+    const { handleFileUpload, audioData, setAudioData, isListening, startMic, stopListening, sourceType } = useAudio();
     const [dragActive, setDragActive] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
     const fileInputRef = useRef(null);
+    const [loading, setLoading] = useState(false);
+
+    const onFileSelect = async (file) => {
+        if (!file) return;
+        setLoading(true);
+        try {
+            await handleFileUpload(file);
+        } catch (e) {
+            console.error(e);
+        }
+        // Small delay to let the animation show (and let audio context initialize)
+        setTimeout(() => setLoading(false), 1500);
+    };
 
     // Settings
     const [showSettings, setShowSettings] = useState(false);
@@ -520,7 +564,7 @@ export default function KeyFinderModule() {
                                 </div>
                             )}
 
-                            {/* YouTube Link Button */}
+                            {/* YouTube Music Link Button */}
                             <button
                                 onClick={async () => {
                                     const url = await YouTubeService.getMostViewedVideo(selectedSong.title, selectedSong.artist);
@@ -528,7 +572,7 @@ export default function KeyFinderModule() {
                                 }}
                                 className="block w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold py-3 px-6 rounded-full transition-all transform hover:scale-105 shadow-lg text-center cursor-pointer"
                             >
-                                🎵 Play on YouTube
+                                🎵 Play on YouTube Music
                             </button>
                         </div>
                     </div>
@@ -536,7 +580,7 @@ export default function KeyFinderModule() {
             )
             }
 
-            <div className="flex flex-col items-center justify-center w-full max-w-6xl mx-auto p-6 z-10 animate-fade-in pb-20">
+            <div className="flex flex-col items-center justify-center w-full max-w-6xl mx-auto px-4 pt-24 pb-32 md:p-6 md:pt-28 z-10 animate-fade-in">
                 <h2 className="text-4xl font-bold mb-8 neon-text">Top Songs</h2>
 
                 <div className="w-full flex justify-end items-center mb-4">
@@ -668,6 +712,72 @@ export default function KeyFinderModule() {
                                         allowFullScreen
                                     ></iframe>
                                 </div>
+                            ) : loading ? (
+                                <div className="w-full h-full glass-panel flex flex-col items-center justify-center text-center p-10">
+                                    <div className="relative w-20 h-20 mb-6">
+                                        <div className="absolute inset-0 rounded-full border-4 border-white/10"></div>
+                                        <div className="absolute inset-0 rounded-full border-4 border-t-transparent border-l-transparent border-r-transparent border-b-cyan-500 animate-spin"></div>
+                                        {/* Inner pulse */}
+                                        <div className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 animate-pulse"></div>
+                                    </div>
+                                    <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 animate-pulse">
+                                        Analyzing Audio...
+                                    </h3>
+                                    <p className="text-gray-500 mt-2 text-sm">Detecting Key & BPM</p>
+                                </div>
+                            ) : sourceType === 'file' ? (
+                                <div className="w-full h-full glass-panel flex flex-col items-center justify-center text-center p-10 relative overflow-hidden animate-fade-in">
+                                    <button
+                                        onClick={() => {
+                                            stopListening();
+                                            setLoading(false);
+                                        }}
+                                        className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                                        title="Close Results"
+                                    >
+                                        <X className="w-6 h-6" />
+                                    </button>
+
+                                    <h3 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-8">
+                                        Analysis Complete
+                                    </h3>
+
+                                    <div className="grid grid-cols-2 gap-4 w-full max-w-lg mb-6">
+                                        {/* Key */}
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 hover:border-neon-blue/50 transition-colors group">
+                                            <div className="text-gray-400 text-xs uppercase tracking-wider mb-2 group-hover:text-neon-blue transition-colors">Key</div>
+                                            <div className="text-4xl font-bold text-white tracking-tight">
+                                                {audioData.estimatedKey || '-'}
+                                            </div>
+                                        </div>
+
+                                        {/* BPM */}
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 hover:border-purple-500/50 transition-colors group">
+                                            <div className="text-gray-400 text-xs uppercase tracking-wider mb-2 group-hover:text-purple-500 transition-colors">BPM</div>
+                                            <div className="text-4xl font-bold text-purple-400 tracking-tight">
+                                                {audioData.bpm || '--'}
+                                            </div>
+                                        </div>
+
+                                        {/* Range */}
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 hover:border-pink-500/50 transition-colors group">
+                                            <div className="text-gray-400 text-xs uppercase tracking-wider mb-2 group-hover:text-pink-500 transition-colors">Range</div>
+                                            <div className="text-3xl font-bold text-white tracking-tight break-words">
+                                                {audioData.pitchRange ?
+                                                    `${audioData.pitchRange.minNote.fullName} - ${audioData.pitchRange.maxNote.fullName}`
+                                                    : '-'}
+                                            </div>
+                                        </div>
+
+                                        {/* Voice Type */}
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 hover:border-cyan-500/50 transition-colors flex flex-col justify-center">
+                                            <div className="text-gray-400 text-xs uppercase tracking-wider mb-2 group-hover:text-cyan-500 transition-colors">Voice Type</div>
+                                            <div className="text-2xl font-bold text-cyan-400 leading-tight">
+                                                {audioData.detectedVoiceTypes.length > 0 ? audioData.detectedVoiceTypes.join(' / ') : '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             ) : (
                                 <div
                                     className={`w-full h-full glass-panel flex flex-col items-center justify-center text-center p-10
@@ -677,7 +787,10 @@ export default function KeyFinderModule() {
                                     onDragEnter={handleDrag}
                                     onDragLeave={handleDrag}
                                     onDragOver={handleDrag}
-                                    onDrop={handleDrop}
+                                    onDrop={(e) => {
+                                        handleDrag(e);
+                                        onFileSelect(e.dataTransfer.files[0]);
+                                    }}
                                 >
                                     <Upload className={`w-16 h-16 mb-4 ${dragActive ? 'text-neon-blue' : 'text-gray-600'}`} />
                                     <h3 className="text-2xl font-bold text-gray-300">Drop Audio File</h3>
@@ -685,7 +798,7 @@ export default function KeyFinderModule() {
                                     <input
                                         type="file"
                                         ref={fileInputRef}
-                                        onChange={(e) => e.target.files[0] && handleFileUpload(e.target.files[0])}
+                                        onChange={(e) => onFileSelect(e.target.files[0])}
                                         accept="audio/*,video/*"
                                         className="hidden"
                                     />

@@ -50,18 +50,52 @@ export const YouTubeService = {
         }));
     },
 
-    // Find the most viewed YouTube video for a song
-    getMostViewedVideo: async (songTitle, artistName) => {
+    // Get cover art from YouTube Music
+    getCoverArt: async (songTitle, artistName) => {
         const apiKey = localStorage.getItem("youtube_api_key");
 
         if (!apiKey) {
-            // Fallback to search URL if no API key
-            return `https://www.youtube.com/results?search_query=${encodeURIComponent(songTitle + ' ' + artistName)}`;
+            return null;
         }
 
         try {
             const cleanTitle = songTitle.replace(/\s*\(.*?\)\s*/g, '').trim();
-            const cleanArtist = artistName.replace(/\s(ft\.|feat\.\|&).*$/i, '').trim();
+            const cleanArtist = artistName.replace(/\s(ft\.|feat\.|\&).*$/i, '').trim();
+
+            const query = `${cleanTitle} ${cleanArtist} official audio`;
+            const res = await fetch(
+                `${YOUTUBE_API_ENDPOINT}/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&maxResults=3&key=${apiKey}`
+            );
+
+            if (!res.ok) return null;
+
+            const data = await res.json();
+
+            if (data.items && data.items.length > 0) {
+                // Get the highest quality thumbnail available
+                const thumbnail = data.items[0].snippet.thumbnails;
+                return thumbnail.high?.url || thumbnail.medium?.url || thumbnail.default?.url;
+            }
+
+            return null;
+        } catch (error) {
+            console.warn('YouTube cover art fetch failed:', error);
+            return null;
+        }
+    },
+
+    // Find the most viewed YouTube Music video for a song
+    getMostViewedVideo: async (songTitle, artistName) => {
+        const apiKey = localStorage.getItem("youtube_api_key");
+
+        if (!apiKey) {
+            // Fallback to YouTube Music search URL if no API key
+            return `https://music.youtube.com/search?q=${encodeURIComponent(songTitle + ' ' + artistName)}`;
+        }
+
+        try {
+            const cleanTitle = songTitle.replace(/\s*\(.*?\)\s*/g, '').trim();
+            const cleanArtist = artistName.replace(/\s(ft\.|feat\.|\&).*$/i, '').trim();
 
             // Try 1: Search for official audio (best match)
             let query = `${cleanTitle} ${cleanArtist} official audio`;
@@ -94,15 +128,16 @@ export const YouTubeService = {
                     item.snippet.title.toLowerCase().includes('official')
                 );
                 const videoId = (officialVideo || data.items[0]).id.videoId;
-                return `https://www.youtube.com/watch?v=${videoId}`;
+                // Return YouTube Music link instead of regular YouTube
+                return `https://music.youtube.com/watch?v=${videoId}`;
             }
 
-            // Fallback to search if no results
-            return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+            // Fallback to YouTube Music search if no results
+            return `https://music.youtube.com/search?q=${encodeURIComponent(query)}`;
         } catch (error) {
             console.error("YouTube API failed:", error);
-            // Fallback to search URL
-            return `https://www.youtube.com/results?search_query=${encodeURIComponent(songTitle + ' ' + artistName)}`;
+            // Fallback to YouTube Music search URL
+            return `https://music.youtube.com/search?q=${encodeURIComponent(songTitle + ' ' + artistName)}`;
         }
     }
 };

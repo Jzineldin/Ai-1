@@ -63,3 +63,40 @@ export class KeyFinder {
         return bestKey;
     }
 }
+
+/**
+ * Static analysis of the entire buffer to find the definitive key.
+ */
+import { autoCorrelate, getNoteFromFrequency } from "./utils";
+
+export function detectKeyFromBuffer(audioBuffer) {
+    const kf = new KeyFinder();
+    const channelData = audioBuffer.getChannelData(0);
+    const sampleRate = audioBuffer.sampleRate;
+
+    // Process in chunks (skip some for speed, but ensure coverage)
+    const windowSize = 4096;
+    const hopSize = 8192; // ~0.18s
+
+    for (let i = 0; i < channelData.length; i += hopSize) {
+        const chunk = channelData.slice(i, i + windowSize);
+        if (chunk.length < windowSize) break;
+
+        // RMS check (skip silence)
+        let rms = 0;
+        for (let j = 0; j < chunk.length; j++) rms += chunk[j] * chunk[j];
+        rms = Math.sqrt(rms / windowSize);
+
+        if (rms > 0.05) {
+            const freq = autoCorrelate(chunk, sampleRate);
+            if (freq !== -1 && freq > 60 && freq < 2000) {
+                const note = getNoteFromFrequency(freq);
+                if (note) {
+                    kf.processNote(note.midi % 12);
+                }
+            }
+        }
+    }
+
+    return kf.estimateKey();
+}

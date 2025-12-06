@@ -21,7 +21,7 @@ export default function Dashboard() {
     } = useAudio();
 
     return (
-        <div className="min-h-screen text-white p-8 flex flex-col items-center justify-center relative">
+        <div className="min-h-screen text-white px-4 pt-24 pb-8 md:p-8 md:pt-28 flex flex-col items-center justify-center relative">
             {/* Background ambient light */}
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-900 rounded-full blur-[150px] opacity-20 pointer-events-none"></div>
 
