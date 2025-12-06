@@ -3,6 +3,9 @@ import { Upload, Music, Search, AlertCircle, Play, Check, Settings, LogIn, Youtu
 import { useAudio } from '../audio/AudioContext';
 import { searchSongs, getRandomSuggestions } from '../services/SongKeyService'; // Mock
 import { YouTubeService } from '../services/YouTubeService'; // YouTube
+import ChordDiagram from './ChordDiagram';
+import PianoChord from './PianoChord';
+import { addChordsToSong } from '../services/ChordService';
 
 // --- SMART COVER COMPONENT ---
 // Automatically finds the correct cover art from iTunes (free/public) 
@@ -97,6 +100,9 @@ export default function KeyFinderModule() {
 
     // Modal for song info display
     const [selectedSong, setSelectedSong] = useState(null);
+
+    // Instrument toggle for chords
+    const [instrument, setInstrument] = useState('guitar'); // 'guitar' or 'piano'
 
     // Genre filtering
     const [selectedGenre, setSelectedGenre] = useState('All');
@@ -200,8 +206,11 @@ export default function KeyFinderModule() {
     };
 
     const selectSong = async (song) => {
+        // Add chords to song if it doesn't have them
+        const songWithChords = addChordsToSong(song);
+
         // Show modal with song info
-        setSelectedSong(song);
+        setSelectedSong(songWithChords);
 
         // Also set the audio data if we have it
         if (song.key && song.key !== "Unknown" && song.key !== "Live Analysis Required") {
@@ -262,6 +271,49 @@ export default function KeyFinderModule() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Chord Progression Section */}
+                            {selectedSong.chords && selectedSong.chords.length > 0 && (
+                                <div className="space-y-3">
+                                    {/* Instrument Toggle */}
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-sm font-bold text-gray-300 uppercase">Chord Progression</h3>
+                                        <div className="flex bg-white/5 rounded-lg p-1">
+                                            <button
+                                                onClick={() => setInstrument('guitar')}
+                                                className={`px-3 py-1 text-xs font-bold rounded transition-all ${instrument === 'guitar'
+                                                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                                                    : 'text-gray-400 hover:text-white'
+                                                    }`}
+                                            >
+                                                🎸 Guitar
+                                            </button>
+                                            <button
+                                                onClick={() => setInstrument('piano')}
+                                                className={`px-3 py-1 text-xs font-bold rounded transition-all ${instrument === 'piano'
+                                                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                                                    : 'text-gray-400 hover:text-white'
+                                                    }`}
+                                            >
+                                                🎹 Piano
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Chord Diagrams */}
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {selectedSong.chords.map((chord, index) => (
+                                            <div key={index}>
+                                                {instrument === 'guitar' ? (
+                                                    <ChordDiagram chord={chord} />
+                                                ) : (
+                                                    <PianoChord chord={chord} />
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* YouTube Link Button */}
                             <button
